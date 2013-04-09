@@ -46,22 +46,21 @@
 			private function applicationComplete(event:FlexEvent):void {		
 				var swfURL:String = this.loaderInfo.url;
 				swfURL = swfURL.substr(0, swfURL.lastIndexOf("/") + 1)
-				rtmpt_server_url = URLUtil.replaceProtocol(swfURL,"rtmpt");
-				rtmp_server_url  = URLUtil.replaceProtocol(swfURL,"rtmp");
+				rtmpt_server_url = URLUtil.replaceProtocol(swfURL,"rtmpt"); //wss
+				rtmp_server_url  = URLUtil.replaceProtocol(swfURL,"rtmp"); //ws
 				rtmp_server_url  = rtmp_server_url.split(String(":"+URLUtil.getPort(rtmp_server_url))).join("");
 				sendBtn.enabled = false;
 				sendManyBtn.enabled = false;				
 				//sendBtn.addEventListener(MouseEvent.CLICK, onClickSendBtn);
-				explain.text="To run test:\n - Select the protocol you want (RTMPT/RTMP) and wait for connect.\n" +
-					"- Select the number of msgs per blast\n" +
-					"- Select the interval between blasts (ms)\n"+
-					"- Select the number of blasts.\n"+
-					"- Click 'Send many messages' to run test\n"+
-					"The default values usually fail on my system with RTMPT. (You may need to click the test more than once.)\n"+
-					"I have never seen RTMP fail.\n"+
-					"EXPECTED RESULT: you will see NetConnection.Connect.Closed in status window."+
-					"Somtimes, the received message count will not match the sent message count, but the NetConnection status will not show as closed, and everything is stopped. This is rare, but checking the red5 server log shows that the server thinks the connection is closed."+
-					"Sometimes the server will get exceptions after the it announces the connection is closed. I guess this is attempting to handle messages after the connection is closed and the server shared object instance is deleted (?)."
+				explain.text="TO RUN TEST:\n\n* Enter the message you want to send.\n" +
+					"* Select the protocol you want (WSS/WS) and wait for connect.\n" +
+					"* For a single message:\n" +
+					"   - Click 'Send'\n" +
+					"* For multiple messages:\n"+
+					"   - Select the number of msgs per blast.\n" +
+					"   - Select the interval between blasts (ms).\n" +
+					"   - Select the number of blasts.\n" +
+					"   - Click 'Send many messages' to run test."
 			}			
 			
 			
@@ -268,7 +267,7 @@
 				<mx:TextArea  width="200" id="rtmptUrl" text="{rtmpt_server_url}" /> 
 				<mx:RadioButton groupName="connectType" 
 								id="rtmp"
-								label="RTMP" 
+								label="WS" 
 								click="handleRTMP(event);"
 								/>	
 				<mx:TextArea width="200" id="rtmpUrl" text="{rtmp_server_url}" /> 
