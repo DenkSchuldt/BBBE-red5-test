@@ -15,50 +15,41 @@
 			import flash.events.*;
 			import flash.net.*;
 			
+			import flashx.textLayout.events.UpdateCompleteEvent;
 			import flashx.textLayout.tlf_internal;
 			
 			import mx.controls.Alert;
 			import mx.events.FlexEvent;
 			import mx.utils.URLUtil;			
 									
-			[Bindable] private var wss_server_url:String = "";			
-			[Bindable] private var ws_server_url:String = "";			
-			[Bindable] private var _nc : NetConnection;
-			
-			private var _so : SharedObject;
-			private var nextMsgInited:Boolean = false;
+			[Bindable] private var swfURL:String = "";	
 			
 			// count of msgs sent & received since application start
 			[Bindable] private var _msg_scount:int = 0;
-			[Bindable] private var _msg_rcount:int = 0;
-			private var _msg_expected_count:int = 0;
-			private var _next_msg_expected:int = 0;
+			[Bindable] private var _msg_rcount:int = 0;			
       
 			/* Controls "send many messages"*/			
 			// how many messages to send each blast
 			[Bindable] private var _messageCount : String = int(20).toString();			
 			// interval between blasts
-			[Bindable] private var _millisecondInterval : String = int(4).toString();			
+			[Bindable] private var _millisecondInterval : String = int(1000).toString();			
 			// number of blasts
 			[Bindable] private var _blastCnt : String = int(200).toString();	
 						
-			private var myTimer:Timer;
+			private var myTimer:Timer;			
 			
 			//Using FlashSocket.IO
 			[Bindable] protected var socket:FlashSocket;
 			
 			private function applicationComplete(event:FlexEvent):void {		
-				var swfURL:String = this.loaderInfo.url;
+				swfURL = this.loaderInfo.url;
 				swfURL = swfURL.substr(0, swfURL.lastIndexOf("/") + 1)				
-				wss_server_url = URLUtil.replaceProtocol(swfURL,"rtmpt"); //Change to wss
-				ws_server_url  = URLUtil.replaceProtocol(swfURL,"rtmp"); //Change to ws
-				ws_server_url  = ws_server_url.split(String(":"+URLUtil.getPort(ws_server_url))).join("");
 				sendBtn.enabled = false;
 				sendManyBtn.enabled = false;				
 															
 				//sendBtn.addEventListener(MouseEvent.CLICK, onClickSendBtn);
 				explain.text="TO RUN TEST:\n\n* Enter the message you want to send.\n" +
-					"* Select the protocol you want (WSS/WS) and wait for connect.\n" +
+					"* Enter the url to connect using ws, and click WS.\n" + 					
 					"* For a single message:\n" +
 					"   - Click 'Send'\n" +
 					"* For multiple messages:\n"+
@@ -68,156 +59,33 @@
 					"   - Click 'Send many messages' to run test."
 			}			
 			
-			
-			private function connect(server_url:String):void {
-				statusOutput.text = "Connecting to: "+server_url +"\n";
-				_nc = new NetConnection();
-				_nc.maxPeerConnections = 1;
-				_nc.addEventListener(NetStatusEvent.NET_STATUS, netStatusHandler);
-				_nc.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
-				_nc.addEventListener(AsyncErrorEvent.ASYNC_ERROR,asyncErrorHandler);				
-				_nc.client = this;
-				_nc.connect(server_url);
-				toggleSO();				
-			}	
-			
-			private function closeSO():void {
-				if(_so != null) {
-					_so.close();
-					_so = null;	
-				}					
-			}
-			
-			private function toggleSO():void {
-				if (soCB.selected) {
-					openSO();
-				} else {
-					closeSO();
-				}			
-			}	
-			
-			private function openSO():void {
-				_so = SharedObject.getRemote("message", _nc.uri, false);
-				_so.client    = this;
-				_so.connect(_nc);		
-			}	
-
 			private function close():void{
-				if (_nc != null) {
-					stopTimer();
-					closeSO();
-					_nc.close();
-					_msg_scount = 0;
-					_msg_rcount = 0;
-					_msg_expected_count = 0;
-					outputTf.text = "";
-					statusOutput.text = "";
-				}
-			}					
-			
-			private function handleRTMPT(event:Event):void {
-				//close();
-				//wss_server_url = rtmptUrl.text;
-				//connect(wss_server_url);
+				stopTimer();								
+				_msg_scount = 0;
+				_msg_rcount = 0;				
+				outputTf.text = "";
+				statusOutput.text = "";
 			}			
-			
-			public function onBWCheck(...rest):Number {
-				return 0;
-			}
-			
-			public function onBWDone(...rest):void {
-				var p_bw:Number;
-				if (rest.length > 0){
-					p_bw = rest[0];
-				}
-				trace("bandwidth = " + p_bw + " Kbps.");
-			}	
-						
-			private function sendManyMessages() : void {
-				_messageCount = _messageCountLabel.text;
-				myTimer = new Timer(int(_millisecondIntervalLabel.text),int(_blastCntLabel.text));
-				myTimer.addEventListener(TimerEvent.TIMER, sendMessageEvent);
-				myTimer.start();
-			}			
-			
-			private function sendMessageEvent(e:TimerEvent):void {
-				for(var i:int = 1; i <=  int(_messageCount); i++) {
-					//var msg:String = randomString();
+									
+			private function sendMessageEvent(e:TimerEvent):void {				
+				for(var i:int = 1; i <=  int(_messageCount); i++) {															
+					var message:String = messageTf.text;
+					socket.send(message,'send');
 					_msg_scount = _msg_scount + 1;
-					_nc.call("sendMessage", null, soCB.selected);					
 				}
-			}			
+			}
 			
 			private function onClickSendBtn():void {
 				_msg_scount = _msg_scount + 1;				
-				var message:String = messageTf.text; 
-				socket.send(message,'send');			
+				var message:String = messageTf.text;
+				socket.send(message,'send');
 			}			      	
-      
-			public function receiveMessage(mesg:int, nextMsg:int):void {
-				_msg_rcount = _msg_rcount + 1;        
-	        	if (! nextMsgInited){
-	          		nextMsgInited = true;
-    	      		_next_msg_expected = nextMsg;
-        		}else{
-          			if (_next_msg_expected != mesg){
-	            		statusOutput.text += "expected : "+ 	String(_next_msg_expected) + 
-	              		", received: "+ String(mesg) + "\n"
-	          		}          
-        		}        
-        		if (_msg_rcount < 10){
-          			outputTf.text += _msg_rcount.toString() + ": " + String(mesg)+"\n";
-        		}        
-				// display every 100th msg or if the msg sent count matches the msg recvd count.
-				// If every msg is displayed, the system slows down and failures dont happen.
-				if ((_msg_rcount == _msg_scount) || (0 == (_msg_rcount % 100))) {
-					outputTf.text += _msg_rcount.toString() + ": " + String(mesg)+"\n";
-				}              
-        		_next_msg_expected = nextMsg;
-				_msg_expected_count = mesg;
-			}
-			
-			private function asyncErrorHandler(event:AsyncErrorEvent):void {
-				statusOutput.text += "asyncErrorHandler \n";
-				statusOutput.text += event.text + "\n------------------------------------------\n\n";			
-			}
 			
 			private function stopTimer():void {
 				if (myTimer) {
 					myTimer.removeEventListener(TimerEvent.TIMER, sendMessageEvent);
 					myTimer.stop();
 				}
-			}
-			
-			private function netStatusHandler(event:NetStatusEvent):void {
-				statusOutput.text += "netStatusHandler \n";				
-				if (event.info !== '' || event.info !== null) { 
-					switch (event.info.code) {
-						case "NetConnection.Connect.Success":  					
-							sendBtn.enabled = true;
-							sendManyBtn.enabled = true;
-							break;
-						case "NetConnection.Connect.Closed":  		
-							stopTimer();
-							sendBtn.enabled = false;
-							sendManyBtn.enabled = false;	
-							// update text field with latest received count
-							outputTf.text += _msg_rcount.toString()
-							break;
-					}
-				}
-				for ( var prop:String in event.info) {
-					statusOutput.text += "prop : "+prop+" = "+event.info[prop]+"\n";					
-				}
-				statusOutput.text += event.info.code+"\n------------------------------------------\n\n";
-			}			
-			
-			private function securityErrorHandler(event:SecurityErrorEvent):void {
-				statusOutput.text += "securityErrorHandler \n";			
-				for (var prop:String in event){
-					statusOutput.text += "prop "+prop+" = "+event[prop]+"\n";
-				}
-				statusOutput.text += "\n------------------------------------------\n\n";
 			}
 			
 			//--------------------------------
@@ -229,38 +97,42 @@
 			 ***************************************************************************************************/
 			
 			private function handleWS(event:Event):void {
-				//Conexión de Websocket aquí!!						
-				if(socket){
-					socket.send(connect,'reconnect');
-				}else{
-					socket = new FlashSocket("192.168.1.182:1111");				
-					socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);				
-					socket.addEventListener(FlashSocketEvent.MESSAGE, onMessage);
-					socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
-					socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);				
-					socket.addEventListener("reconnect",onReconnect);
-					socket.addEventListener("receive",onReceive);
-					socket.addEventListener("disconnected",onDisconnect);
-					sendBtn.enabled = true;
-				}				
+				close();
+				socket = new FlashSocket(wsUrl.text);				
+				socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);				
+				socket.addEventListener(FlashSocketEvent.MESSAGE, onMessage);
+				socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
+				socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);									
+				socket.addEventListener("receive", onReceive);
+				socket.addEventListener("disconnected", onDisconnect);
+				if(!socket.connected){
+					sendBtn.enabled = false;
+					sendManyBtn.enabled = false;
+					setStatus("\nCould not connect to the server. The URL could be incorrect.\n");
+				}
 			}		
+						
+			private function sendManyMessages() : void {
+				_messageCount = _messageCountLabel.text;
+				myTimer = new Timer(int(_millisecondIntervalLabel.text),int(_blastCntLabel.text));
+				myTimer.addEventListener(TimerEvent.TIMER, sendMessageEvent);
+				myTimer.start();				
+			}
 			
 			protected function onConnect(event:FlashSocketEvent):void{
 				clearStatus();
-				socket.send(connect,'connect');				
+				socket.send({websocket: 'connected'},'connect');
+				sendBtn.enabled = true;
+				sendManyBtn.enabled = true;
 			}
 			
 			protected function onDisconnect(event:FlashSocketEvent):void{
 				setStatus('\n'+event.data);				
-			}
-			
-			protected function onReconnect(event:FlashSocketEvent):void{
-				setStatus('\n'+event.data);
-			}
+			}			
 			
 			protected function onReceive(event:FlashSocketEvent):void{
-				_msg_rcount = _msg_rcount + 1;
-				setStatus('\n'+event.data);				
+				outputTf.text += '\n\t'+event.data;
+				_msg_rcount++;
 			}
 			
 			protected function onError(event:FlashSocketEvent):void{			
@@ -271,7 +143,7 @@
 				setStatus('\n'+event.data);				
 			}			
 			
-			protected function setStatus(msg:String):void{			
+			protected function setStatus(msg:String):void{
 				statusOutput.text += msg;			
 			}
 			
@@ -287,11 +159,11 @@
 				<mx:TextArea  width="580" height="437" id="outputTf" />
 				<mx:HBox>
 					<mx:TextInput id="messageTf" text="test"                          />
-					<mx:Button  label="Send" id="sendBtn"  click="onClickSendBtn()" enabled="{_nc.connected}" />	
+					<mx:Button  label="Send" id="sendBtn"  click="onClickSendBtn()"   />	
 				</mx:HBox> 	
 			</mx:VBox> 			
 			<mx:HBox  width="603" borderStyle="solid" paddingLeft="10" paddingRight="10" paddingTop="10" paddingBottom="10">	
-				<mx:Button id="sendManyBtn" label="Send many messages" click="sendManyMessages()" enabled="{_nc.connected}"  />	
+				<mx:Button id="sendManyBtn" label="Send many messages" click="sendManyMessages()" />	
 				<mx:Label text="Msgs per Blast"                                                         />
 				<mx:TextInput width="50" text="{_messageCount}" id="_messageCountLabel"                  />	
 				<mx:Label text="Interval(ms)"                                                           />
@@ -303,23 +175,16 @@
 				<mx:Label text="Msgs sent:"                                />
 				<mx:TextInput width="50" text="{_msg_scount}"              />	
 				<mx:Label text="Msgs rcvd:"                                />
-				<mx:TextInput width="50" text="{_msg_rcount}"              />
-				<mx:CheckBox id="soCB" click="toggleSO();" selected="true" label="Listen to SharedObject?" />
+				<mx:TextInput width="50" text="{_msg_rcount}"              />				
 			</mx:HBox>
 			<mx:HBox  width="603" borderStyle="solid" paddingLeft="10" paddingRight="10" paddingTop="10" paddingBottom="10">
-				<mx:Label width="20"                                       />
-				<mx:RadioButton groupName="connectType" 
-								id="rtmpt"
-								label="RTMPT" 
-								click="handleRTMPT(event);"
-								/>
-				<mx:TextArea  width="200" id="rtmptUrl" text="{wss_server_url}" /> 
+				<mx:Label width="20"                                       />				
 				<mx:RadioButton groupName="connectType" 
 								id="rtmp"
 								label="WS" 
 								click="handleWS(event);"
 								/>	
-				<mx:TextArea width="200" id="rtmpUrl" text="{ws_server_url}" /> 
+				<mx:TextArea width="200" id="wsUrl" text="{swfURL}" /> 
 			</mx:HBox>			
 		</mx:VBox>
 		<mx:VBox>			
