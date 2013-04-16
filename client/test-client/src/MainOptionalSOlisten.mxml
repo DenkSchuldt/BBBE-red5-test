@@ -100,11 +100,11 @@
 				close();
 				socket = new FlashSocket(wsUrl.text);				
 				socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);				
-				socket.addEventListener(FlashSocketEvent.MESSAGE, onMessage);
+				socket.addEventListener(FlashSocketEvent.MESSAGE, onReceive);
 				socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
-				socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);									
-				socket.addEventListener("receive", onReceive);
-				socket.addEventListener("disconnected", onDisconnect);
+				socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);				
+				socket.addEventListener("established", onMessage);
+				socket.addEventListener("disconnected", onMessage);
 				if(!socket.connected){
 					sendBtn.enabled = false;
 					sendManyBtn.enabled = false;
@@ -125,10 +125,6 @@
 				sendBtn.enabled = true;
 				sendManyBtn.enabled = true;
 			}
-			
-			protected function onDisconnect(event:FlashSocketEvent):void{
-				setStatus('\n'+event.data);				
-			}			
 			
 			protected function onReceive(event:FlashSocketEvent):void{
 				outputTf.text += '\n\t'+event.data;
