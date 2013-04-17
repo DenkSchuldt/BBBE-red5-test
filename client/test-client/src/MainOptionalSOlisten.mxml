@@ -11,10 +11,6 @@
 		<![CDATA[			
 			import com.pnwrain.flashsocket.FlashSocket;
 			import com.pnwrain.flashsocket.events.FlashSocketEvent;
-			import com.worlize.websocket.WebSocket;
-			import com.worlize.websocket.WebSocketErrorEvent;
-			import com.worlize.websocket.WebSocketEvent;
-			import com.worlize.websocket.WebSocketMessage;
 			
 			import flash.events.*;
 			import flash.net.*;
@@ -44,14 +40,7 @@
 			//Using FlashSocket.IO
 			[Bindable] protected var ws_socket: FlashSocket;
 			//Using AS3WebSocket
-			[Bindable] protected var wss_socket: com.worlize.websocket.WebSocket;
-			
-			protected var policy:String = '<?xml version="1.0"?>' +
-				'<!DOCTYPE cross-domain-policy SYSTEM "/xml/dtds/cross-domain-policy.dtd">' +
-				'<cross-domain-policy>' +
-				'<site-control permitted-cross-domain-policies="master-only"/>' +
-				'<allow-access-from domain="*" to-ports="*" />' +
-				'</cross-domain-policy>';
+			[Bindable] protected var wss_socket: FlashSocket;
 			
 			private function applicationComplete(event:FlexEvent):void {		
 				swfURL = this.loaderInfo.url;
@@ -98,13 +87,27 @@
 				}
 			}
 			
+			private function sendManyMessages() : void {
+				_messageCount = _messageCountLabel.text;
+				myTimer = new Timer(int(_millisecondIntervalLabel.text),int(_blastCntLabel.text));
+				myTimer.addEventListener(TimerEvent.TIMER, sendMessageEvent);
+				myTimer.start();				
+			}
+			
+			protected function setStatus(msg:String):void{
+				statusOutput.text += msg;			
+			}
+			
+			protected function clearStatus():void{
+				statusOutput.text = "";
+				this.currentState = "";
+			}
+			
 			//--------------------------------
 			/*Functions using FlashSocket.IO*/
 			//--------------------------------			
-			/****************************************************************************************************
-			 ****************************************************************************************************
-			 ***************************************************************************************************/
 			
+			//::: WebSocket Connection :::
 			private function handleWS():void {
 				close();
 				ws_socket = new FlashSocket(wsUrl.text);
@@ -120,17 +123,31 @@
 					setStatus("\nCould not connect to the server. The WS URL could be incorrect.");
 				}
 			}
-						
-			private function sendManyMessages() : void {
-				_messageCount = _messageCountLabel.text;
-				myTimer = new Timer(int(_millisecondIntervalLabel.text),int(_blastCntLabel.text));
-				myTimer.addEventListener(TimerEvent.TIMER, sendMessageEvent);
-				myTimer.start();				
+												
+			//::: Secure WebSocket Connection :::
+			private function handleWSS():void{
+				close();				
+				wss_socket = new FlashSocket(wssUrl.text);
+				wss_socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);
+				wss_socket.addEventListener(FlashSocketEvent.MESSAGE, onReceive);
+				wss_socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
+				wss_socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);
+				wss_socket.addEventListener("established", onMessage);
+				wss_socket.addEventListener("disconnected", onMessage);						
+				if(!wss_socket.connected){
+					sendBtn.enabled = false;
+					sendManyBtn.enabled = false;
+					setStatus("\nCould not connect to the server. The WSS URL could be incorrect.");
+				}				
 			}
 			
 			protected function onConnect(event:FlashSocketEvent):void{
+				Alert.show("Cualquier mensaje en Connect");
 				clearStatus();
-				ws_socket.send({websocket: 'connected'},'connect');
+				if(ws_socket)
+					ws_socket.send({websocket: 'connected'},'connect');
+				if(wss_socket)
+					wss_socket.send({websocket: 'connected'},'connect');
 				sendBtn.enabled = true;
 				sendManyBtn.enabled = true;
 			}
@@ -146,63 +163,6 @@
 			
 			protected function onMessage(event:FlashSocketEvent):void{				
 				setStatus('\n'+event.data);				
-			}			
-			
-			protected function setStatus(msg:String):void{
-				statusOutput.text += msg;			
-			}
-			
-			protected function clearStatus():void{
-				statusOutput.text = "";
-				this.currentState = "";
-			}
-			
-			//--------------------------------
-			/*Functions using AS3WebSocket*/
-			//--------------------------------			
-			//------------------------------------------------------------------------------------------------
-			//------------------------------------------------------------------------------------------------
-			//------------------------------------------------------------------------------------------------
-			
-			private function handleWSS():void{
-				wss_socket = new com.worlize.websocket.WebSocket("wss://"+wssUrl.text,"*","wss");				
-				wss_socket.addEventListener(WebSocketEvent.CLOSED, wssClosed);
-				wss_socket.addEventListener(WebSocketEvent.OPEN, wssOpen);
-				wss_socket.addEventListener(WebSocketEvent.MESSAGE, wssMessage);
-				wss_socket.addEventListener(WebSocketErrorEvent.CONNECTION_FAIL, wssConnectionFail);
-				wss_socket.connect();				
-				if(!wss_socket.connected){
-					sendBtn.enabled = false;
-					sendManyBtn.enabled = false;
-					setStatus("\nCould not connect to the server. The WSS URL could be incorrect.");
-				}
-			}
-			
-			private function wssOpen(event:WebSocketEvent):void {				
-				setStatus("CoNeCtAaAadOoOoOoO!!!!");
-				sendBtn.enabled = true;
-				sendManyBtn.enabled = true;
-				wss_socket.sendUTF("Hello World!\n");				
-				var binaryData:ByteArray = new ByteArray();
-				binaryData.writeUTF("Hello as Binary Message!");
-				wss_socket.sendBytes(binaryData);				
-			}
-			
-			private function wssClosed(event:WebSocketEvent):void {
-				setStatus("\nDisconnected");
-			}
-			
-			private function wssConnectionFail(event:WebSocketErrorEvent):void {
-				setStatus("Connection Failure: " + event.text);
-			}
-			
-			private function wssMessage(event:WebSocketEvent):void {
-				if (event.message.type === WebSocketMessage.TYPE_UTF8){
-					setStatus("Got message: " + event.message.utf8Data);
-				}
-				else if (event.message.type === WebSocketMessage.TYPE_BINARY){
-					setStatus("Got binary message of length " + event.message.binaryData.length);
-				}
 			}
 		]]>		
 	</fx:Script>
