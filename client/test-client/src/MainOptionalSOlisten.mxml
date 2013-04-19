@@ -38,17 +38,16 @@
 			[Bindable] private var _blastCnt : String = int(200).toString();	
 			
 			//Using FlashSocket.IO
-			[Bindable] protected var ws_socket: FlashSocket;
-			//Using AS3WebSocket
+			[Bindable] protected var ws_socket: FlashSocket;			
 			[Bindable] protected var wss_socket: FlashSocket;
 			
-			private function applicationComplete(event:FlexEvent):void {		
+			private function applicationComplete(event:FlexEvent):void{		
 				swfURL = this.loaderInfo.url;
 				swfURL = swfURL.substr(0, swfURL.lastIndexOf("/") + 1)				
 				sendBtn.enabled = false;
 				sendManyBtn.enabled = false;
 				explain.text="TO RUN TEST:\n\n* Enter the message you want to send.\n" +
-					"* Enter the url to connect using ws, and click WS.\n" + 					
+					"* Enter the url to connect using ws/wss, and click WS/WSS.\n" + 					
 					"* For a single message:\n" +
 					"   - Click 'Send'\n" +
 					"* For multiple messages:\n"+
@@ -64,12 +63,25 @@
 				_msg_rcount = 0;				
 				outputTf.text = "";
 				statusOutput.text = "";
+				if(ws_socket){
+					if(ws_socket.connected){
+						ws_socket = null;
+					}
+				}
+				if(wss_socket){
+					if(wss_socket.connected){
+						wss_socket = null;
+					}
+				}
 			}			
 									
 			private function sendMessageEvent(e:TimerEvent):void {				
 				for(var i:int = 1; i <=  int(_messageCount); i++) {															
 					var message:String = messageTf.text;
-					ws_socket.send(message,'send');
+					if(ws_socket)
+						ws_socket.send(message,'send');
+					if(wss_socket)
+						wss_socket.send(message,'send');
 					_msg_scount = _msg_scount + 1;
 				}
 			}
@@ -77,7 +89,10 @@
 			private function onClickSendBtn():void {
 				_msg_scount = _msg_scount + 1;				
 				var message:String = messageTf.text;
-				ws_socket.send(message,'send');
+				if(ws_socket)
+					ws_socket.send(message,'send');
+				if(wss_socket)
+					wss_socket.send(message,'send');
 			}			      	
 			
 			private function stopTimer():void {
@@ -110,13 +125,13 @@
 			//::: WebSocket Connection :::
 			private function handleWS():void {
 				close();
-				ws_socket = new FlashSocket(wsUrl.text);
+				ws_socket = new FlashSocket(wsUrl.text);				
 				ws_socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);
 				ws_socket.addEventListener(FlashSocketEvent.MESSAGE, onReceive);
 				ws_socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
 				ws_socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);
 				ws_socket.addEventListener("established", onMessage);
-				ws_socket.addEventListener("disconnected", onMessage);
+				ws_socket.addEventListener("disconnected", onMessage);				
 				if(!ws_socket.connected){
 					sendBtn.enabled = false;
 					sendManyBtn.enabled = false;
@@ -127,27 +142,28 @@
 			//::: Secure WebSocket Connection :::
 			private function handleWSS():void{
 				close();				
-				wss_socket = new FlashSocket(wssUrl.text);
-				wss_socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);
+				wss_socket = new FlashSocket(wssUrl.text);								
+				wss_socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);					
 				wss_socket.addEventListener(FlashSocketEvent.MESSAGE, onReceive);
 				wss_socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
 				wss_socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);
 				wss_socket.addEventListener("established", onMessage);
-				wss_socket.addEventListener("disconnected", onMessage);						
+				wss_socket.addEventListener("disconnected", onMessage);									
 				if(!wss_socket.connected){
 					sendBtn.enabled = false;
 					sendManyBtn.enabled = false;
 					setStatus("\nCould not connect to the server. The WSS URL could be incorrect.");
-				}				
+				}
 			}
 			
-			protected function onConnect(event:FlashSocketEvent):void{
-				Alert.show("Cualquier mensaje en Connect");
+			protected function onConnect(event:FlashSocketEvent):void{				
 				clearStatus();
-				if(ws_socket)
-					ws_socket.send({websocket: 'connected'},'connect');
-				if(wss_socket)
-					wss_socket.send({websocket: 'connected'},'connect');
+				if(ws_socket){
+					ws_socket.send({websocket: 'connected'},'connect');										
+				}
+				if(wss_socket){
+					wss_socket.send({websocket_secure: 'connected'},'connect');										
+				}
 				sendBtn.enabled = true;
 				sendManyBtn.enabled = true;
 			}
