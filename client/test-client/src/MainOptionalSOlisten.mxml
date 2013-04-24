@@ -20,10 +20,15 @@
 			
 			import mx.controls.Alert;
 			import mx.events.FlexEvent;
-			import mx.utils.URLUtil;			
-									
-			[Bindable] private var swfURL:String = "";
+			import mx.utils.URLUtil;	
+			
+			import flash.external.*;
+			
+			[Bindable] private var swfURL:String = "";					   
 					   private var myTimer:Timer;
+			
+			private var wsURL:String = "ws://192.168.1.182:7171";
+			private var wssURL:String = "wss://192.168.1.182:7272";
 			
 			// count of msgs sent & received since application start
 			[Bindable] private var _msg_scount:int = 0;
@@ -46,6 +51,9 @@
 				swfURL = swfURL.substr(0, swfURL.lastIndexOf("/") + 1)				
 				sendBtn.enabled = false;
 				sendManyBtn.enabled = false;
+				
+				ExternalInterface.addCallback("setStatus",setStatus);
+				
 				explain.text="TO RUN TEST:\n\n* Enter the message you want to send.\n" +
 					"* Enter the url to connect using ws/wss, and click WS/WSS.\n" + 					
 					"* For a single message:\n" +
@@ -87,12 +95,13 @@
 			}
 			
 			private function onClickSendBtn():void {
-				_msg_scount = _msg_scount + 1;				
+				ExternalInterface.call("alert","Send Button Clicked");
+				/*_msg_scount = _msg_scount + 1;				
 				var message:String = messageTf.text;
 				if(ws_socket)
 					ws_socket.send(message,'send');
 				if(wss_socket)
-					wss_socket.send(message,'send');
+					wss_socket.send(message,'send');*/
 			}			      	
 			
 			private function stopTimer():void {
@@ -123,25 +132,27 @@
 			//--------------------------------			
 			
 			//::: WebSocket Connection :::
-			private function handleWS():void {
-				close();
-				ws_socket = new FlashSocket(wsUrl.text);				
+			private function handleWS():void {					
+				ExternalInterface.call("ws",wsUrl.text);				
+				/*close();
+				ws_socket = new FlashSocket(wsUrl.text);
 				ws_socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);
 				ws_socket.addEventListener(FlashSocketEvent.MESSAGE, onReceive);
 				ws_socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
 				ws_socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);
 				ws_socket.addEventListener("established", onMessage);
-				ws_socket.addEventListener("disconnected", onMessage);				
+				ws_socket.addEventListener("disconnected", onMessage);
 				if(!ws_socket.connected){
 					sendBtn.enabled = false;
 					sendManyBtn.enabled = false;
 					setStatus("\nCould not connect to the server. The WS URL could be incorrect.");
-				}
+				}*/
 			}
 												
 			//::: Secure WebSocket Connection :::
 			private function handleWSS():void{
-				close();				
+				ExternalInterface.call("wss",wssUrl.text);
+				/*close();				
 				wss_socket = new FlashSocket(wssUrl.text);								
 				wss_socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);					
 				wss_socket.addEventListener(FlashSocketEvent.MESSAGE, onReceive);
@@ -153,10 +164,10 @@
 					sendBtn.enabled = false;
 					sendManyBtn.enabled = false;
 					setStatus("\nCould not connect to the server. The WSS URL could be incorrect.");
-				}
+				}*/
 			}
 			
-			protected function onConnect(event:FlashSocketEvent):void{				
+			/*protected function onConnect(event:FlashSocketEvent):void{				
 				clearStatus();
 				if(ws_socket){
 					ws_socket.send({websocket: 'connected'},'connect');										
@@ -179,8 +190,8 @@
 			
 			protected function onMessage(event:FlashSocketEvent):void{				
 				setStatus('\n'+event.data);				
-			}
-		]]>		
+			}*/			
+		]]>
 	</fx:Script>
 	<mx:HBox>	
 		<mx:VBox>
@@ -213,13 +224,13 @@
 								label="WS" 
 								click="handleWS();"
 								/>	
-				<mx:TextArea width="200" id="wsUrl" text="{swfURL}" />
+				<mx:TextArea width="200" id="wsUrl" text="{wsURL}"/>
 				<mx:RadioButton groupName="connectType" 
 								id="wss"
 								label="WSS" 
 								click="handleWSS();"
 								/>	
-				<mx:TextArea width="200" id="wssUrl" text="{swfURL}" />
+				<mx:TextArea width="200" id="wssUrl" text="{wssURL}"/>
 			</mx:HBox>			
 		</mx:VBox>
 		<mx:VBox>			
