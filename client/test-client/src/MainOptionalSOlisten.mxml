@@ -131,7 +131,7 @@
 				ws_socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
 				ws_socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);
 				ws_socket.addEventListener("established", onMessage);
-				ws_socket.addEventListener("disconnected", onMessage);				
+				ws_socket.addEventListener("disconnect", onDisconnectWS);				
 				if(!ws_socket.connected){
 					sendBtn.enabled = false;
 					sendManyBtn.enabled = false;
@@ -148,7 +148,7 @@
 				wss_socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
 				wss_socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);
 				wss_socket.addEventListener("established", onMessage);
-				wss_socket.addEventListener("disconnected", onMessage);									
+				wss_socket.addEventListener("disconnect", onDisconnectWSS);									
 				if(!wss_socket.connected){
 					sendBtn.enabled = false;
 					sendManyBtn.enabled = false;
@@ -167,6 +167,14 @@
 				sendBtn.enabled = true;
 				sendManyBtn.enabled = true;
 			}
+
+                        protected function onDisconnectWS():void{
+				setStatus('\n{Websocket: Disconnected}');
+                        }
+			
+			protected function onDisconnectWSS():void{
+				setStatus('\n{Secure Websocket: Disconnected}');
+                        }
 			
 			protected function onReceive(event:FlashSocketEvent):void{
 				outputTf.text += '\n\t'+event.data;
