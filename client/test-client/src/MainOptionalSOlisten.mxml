@@ -8,27 +8,30 @@
 	</fx:Declarations>
 	
 	<fx:Script>
-		<![CDATA[			
-			import com.pnwrain.flashsocket.FlashSocket;
-			import com.pnwrain.flashsocket.events.FlashSocketEvent;
+		<![CDATA[	
 			
-			import flash.events.*;
+			//Security.allowDomain("*");
+			//Security.loadPolicyFile("xmlsocket://localhost:7843");
+			
+			import mx.events.FlexEvent;
 			import flash.net.*;
 			
-			import flashx.textLayout.events.UpdateCompleteEvent;
-			import flashx.textLayout.tlf_internal;
 			
-			import mx.controls.Alert;
-			import mx.events.FlexEvent;
-			import mx.utils.URLUtil;			
-									
-			[Bindable] private var swfURL:String = "";
-					   private var myTimer:Timer;
+			
+			//--------------------------------
+			/*     Variable declarations    */
+			//--------------------------------
+			
+			[Bindable] private var swfURL:String = "";					   
+			private var myTimer:Timer;
+			
+			[Bindable] private var socketURL: String = "localhost";
+			[Bindable] protected var _socket: XMLSocket;
 			
 			// count of msgs sent & received since application start
 			[Bindable] private var _msg_scount:int = 0;
 			[Bindable] private var _msg_rcount:int = 0;			
-      
+			
 			/* Controls "send many messages"*/			
 			// how many messages to send each blast
 			[Bindable] private var _messageCount : String = int(20).toString();			
@@ -37,51 +40,83 @@
 			// number of blasts
 			[Bindable] private var _blastCnt : String = int(200).toString();	
 			
-			//Using FlashSocket.IO
-			[Bindable] protected var ws_socket: FlashSocket;			
-			[Bindable] protected var wss_socket: FlashSocket;
+			
+			
+			//--------------------------------
+			/*     Application Complete     */
+			//--------------------------------
 			
 			private function applicationComplete(event:FlexEvent):void{		
 				swfURL = this.loaderInfo.url;
-				swfURL = swfURL.substr(0, swfURL.lastIndexOf("/") + 1)				
-				sendBtn.enabled = false;
-				sendManyBtn.enabled = false;
-				explain.text="TO RUN TEST:\n\n* Enter the message you want to send.\n" +
-					"* Enter the url to connect using ws/wss, and click WS/WSS.\n" + 					
+				swfURL = swfURL.substr(0, swfURL.lastIndexOf("/") + 1);				
+				buttons(false);
+				explain.text = "TO RUN TEST:\n\n* Enter the message you want to send.\n" +
+					"* Enter the url to connect using flash XMLSockets, and click on the socket radio button.\n" + 					
 					"* For a single message:\n" +
 					"   - Click 'Send'\n" +
 					"* For multiple messages:\n"+
 					"   - Select the number of msgs per blast.\n" +
 					"   - Select the interval between blasts (ms).\n" +
 					"   - Select the number of blasts.\n" +
-					"   - Click 'Send many messages' to run test."
+					"   - Click 'Send many messages' to run test.";
 			}			
 			
-			private function close():void{
-				stopTimer();								
-				_msg_scount = 0;
-				_msg_rcount = 0;				
-				outputTf.text = "";
-				statusOutput.text = "";
-				if(ws_socket){
-					if(ws_socket.connected){
-						ws_socket = null;
-					}
-				}
-				if(wss_socket){
-					if(wss_socket.connected){
-						wss_socket = null;
-					}
-				}
-			}			
-									
+			
+			
+			//--------------------------------
+			/*        XMLSocket Handler        */
+			//--------------------------------	
+			
+			private function handleXMLSocket():void {
+				_socket = new XMLSocket();
+				_socket.addEventListener(Event.CONNECT, onConnect);
+				_socket.addEventListener(Event.CLOSE, onClose);
+				_socket.addEventListener(DataEvent.DATA, onData);
+				_socket.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
+				_socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
+				_socket.connect("localhost",7843);
+			}
+			
+			protected function onConnect(event:Event):void{
+				setStatus("\nSocket: " + event);
+				buttons(true);
+			}
+			
+			protected function onClose(event:Event):void{
+				setStatus("\nSocket: " + event);
+				buttons(false);
+			}
+			
+			private function onData(event:DataEvent):void {
+				outputTf.text += '\n\t'+event.data;
+				_msg_rcount++;
+			}
+			
+			private function ioErrorHandler(event:IOErrorEvent):void {
+				setStatus("\nioErrorHandler: " + event);
+			}
+			
+			private function securityErrorHandler(event:SecurityErrorEvent):void {
+				setStatus("\nsecurityErrorHandler: " + event);
+			}
+
+						
+			
+			//--------------------------------
+			/*   Function implementarions   */
+			//--------------------------------
+			
+			private function buttons(value:Boolean):void {
+				sendBtn.enabled = value;
+				sendManyBtn.enabled = value;
+				closeBtn.enabled = value;
+			}
+			
 			private function sendMessageEvent(e:TimerEvent):void {				
 				for(var i:int = 1; i <=  int(_messageCount); i++) {															
 					var message:String = messageTf.text;
-					if(ws_socket)
-						ws_socket.send(message,'send');
-					if(wss_socket)
-						wss_socket.send(message,'send');
+					if(_socket)
+						_socket.send(message);
 					_msg_scount = _msg_scount + 1;
 				}
 			}
@@ -89,11 +124,18 @@
 			private function onClickSendBtn():void {
 				_msg_scount = _msg_scount + 1;				
 				var message:String = messageTf.text;
-				if(ws_socket)
-					ws_socket.send(message,'send');
-				if(wss_socket)
-					wss_socket.send(message,'send');
-			}			      	
+				if(_socket)
+					_socket.send(message);
+			}
+			
+			private function onClickCloseBtn():void {
+				stopTimer();
+				if(_socket){
+					if(_socket.connected){
+						_socket.close();
+					}
+				}
+			}
 			
 			private function stopTimer():void {
 				if (myTimer) {
@@ -118,79 +160,9 @@
 				this.currentState = "";
 			}
 			
-			//--------------------------------
-			/*Functions using FlashSocket.IO*/
-			//--------------------------------			
-			
-			//::: WebSocket Connection :::
-			private function handleWS():void {
-				close();
-				ws_socket = new FlashSocket(wsUrl.text);				
-				ws_socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);
-				ws_socket.addEventListener(FlashSocketEvent.MESSAGE, onReceive);
-				ws_socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
-				ws_socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);
-				ws_socket.addEventListener("established", onMessage);
-				ws_socket.addEventListener("disconnect", onDisconnectWS);				
-				if(!ws_socket.connected){
-					sendBtn.enabled = false;
-					sendManyBtn.enabled = false;
-					setStatus("\nCould not connect to the server. The WS URL could be incorrect.");
-				}
-			}
-												
-			//::: Secure WebSocket Connection :::
-			private function handleWSS():void{
-				close();				
-				wss_socket = new FlashSocket(wssUrl.text);								
-				wss_socket.addEventListener(FlashSocketEvent.CONNECT, onConnect);					
-				wss_socket.addEventListener(FlashSocketEvent.MESSAGE, onReceive);
-				wss_socket.addEventListener(FlashSocketEvent.IO_ERROR, onError);
-				wss_socket.addEventListener(FlashSocketEvent.SECURITY_ERROR, onError);
-				wss_socket.addEventListener("established", onMessage);
-				wss_socket.addEventListener("disconnect", onDisconnectWSS);									
-				if(!wss_socket.connected){
-					sendBtn.enabled = false;
-					sendManyBtn.enabled = false;
-					setStatus("\nCould not connect to the server. The WSS URL could be incorrect.");
-				}
-			}
-			
-			protected function onConnect(event:FlashSocketEvent):void{				
-				clearStatus();
-				if(ws_socket){
-					ws_socket.send({websocket: 'connected'},'connect');										
-				}
-				if(wss_socket){
-					wss_socket.send({websocket_secure: 'connected'},'connect');										
-				}
-				sendBtn.enabled = true;
-				sendManyBtn.enabled = true;
-			}
-
-                        protected function onDisconnectWS():void{
-				setStatus('\n{Websocket: Disconnected}');
-                        }
-			
-			protected function onDisconnectWSS():void{
-				setStatus('\n{Secure Websocket: Disconnected}');
-                        }
-			
-			protected function onReceive(event:FlashSocketEvent):void{
-				outputTf.text += '\n\t'+event.data;
-				_msg_rcount++;
-			}
-			
-			protected function onError(event:FlashSocketEvent):void{			
-				setStatus("\n{Houston, we have a problem!}");
-			}
-			
-			protected function onMessage(event:FlashSocketEvent):void{				
-				setStatus('\n'+event.data);				
-			}
-		]]>		
+		]]>	
 	</fx:Script>
-	<mx:HBox>	
+	<mx:HBox>
 		<mx:VBox>
 			<mx:VBox borderStyle="solid" paddingLeft="10" paddingRight="10" paddingTop="10" paddingBottom="10">			
 				<mx:TextArea  width="580" height="437" id="outputTf" />
@@ -218,16 +190,11 @@
 				<mx:Label width="20"                                       />				
 				<mx:RadioButton groupName="connectType" 
 								id="ws"
-								label="WS" 
-								click="handleWS();"
+								label="XMLSocket" 
+								click="handleXMLSocket();"
 								/>	
-				<mx:TextArea width="200" id="wsUrl" text="{swfURL}" />
-				<mx:RadioButton groupName="connectType" 
-								id="wss"
-								label="WSS" 
-								click="handleWSS();"
-								/>	
-				<mx:TextArea width="200" id="wssUrl" text="{swfURL}" />
+				<mx:TextArea width="200" id="wsUrl" text="{socketURL}"/>
+				<mx:Button  label="Close" id="closeBtn"  click="onClickCloseBtn()"   />
 			</mx:HBox>			
 		</mx:VBox>
 		<mx:VBox>			
@@ -235,7 +202,6 @@
 			<mx:TextArea  width="320" height="219" id="explain" />
 		</mx:VBox>
 	</mx:HBox>
-	
 </s:Application>
 
 
