@@ -1,23 +1,38 @@
+var express = require('express')
+	http    = require('http'),
+    path    = require('path'),
+	app     = express();
 
-var net = require('net');
-var netserver = net.createServer(function(server){
-	server.on('connect', function(data) {
-		console.log("server connected");
+app.configure(function(){
+	app.engine('.html', require('ejs').__express);
+	app.use(express.static(path.join(__dirname, 'public')));
+	app.set('view engine', 'html');
+});
+app.configure('development', function(){
+  app.use(express.errorHandler());
+});
+app.get('/', function(req, res){
+    res.render('index');
+});
+
+var server = http.createServer(app);
+var io = require('socket.io').listen(server);
+
+io.configure(function() {
+  io.set('transports', ['websocket','flashsocket']);
+  io.set('flash policy port', 843);
+});
+
+io.sockets.on('connection', function(socket){
+	socket.on('message', function(data){		
+		io.sockets.emit('message',data);
 	});
-	server.on('data', function(data) {
-		console.log(data.toString());
-		server.write(data.toString());
-	});
-	server.on('close', function() {
-		console.log('server disconnected');
-		server.end();
+	socket.on('close', function(data){		
+		io.sockets.emit('disconnect',data);
 	});
 });
 
-netserver.addListener("error",function(err){
-	console.log("ERROR : " + err);
-});
-
-netserver.listen(7843, '127.0.0.1', function(){
-	console.log("Listening on port 7843.");
+var port = Number(process.env.PORT || 5000);
+server.listen(port, function() {
+	console.log("\tListening on " + port);
 });
